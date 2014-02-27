@@ -56,6 +56,7 @@ static const char udhcpc_longopts[] ALIGN1 =
 	"broadcast\0"      No_argument       "B"
 	IF_FEATURE_UDHCPC_ARPING("arping\0"	No_argument       "a")
 	IF_FEATURE_UDHCP_PORT("client-port\0"	Required_argument "P")
+	IF_FEATURE_DHCP4o6C("dhcp4o6\0"	No_argument       "6")
 	;
 #endif
 /* Must match getopt32 option string order */
@@ -86,9 +87,11 @@ enum {
 	USE_FOR_MMU(             OPTBIT_b,)
 	IF_FEATURE_UDHCPC_ARPING(OPTBIT_a,)
 	IF_FEATURE_UDHCP_PORT(   OPTBIT_P,)
+	IF_FEATURE_DHCP4o6C(      OPTBIT_6,)
 	USE_FOR_MMU(             OPT_b = 1 << OPTBIT_b,)
 	IF_FEATURE_UDHCPC_ARPING(OPT_a = 1 << OPTBIT_a,)
 	IF_FEATURE_UDHCP_PORT(   OPT_P = 1 << OPTBIT_P,)
+	IF_FEATURE_DHCP4o6C(      OPT_6 = 1 << OPTBIT_6,)
 };
 
 
@@ -1068,11 +1071,15 @@ static void change_listen_mode(int new_mode)
 		close(sockfd);
 		sockfd = -1;
 	}
+#if !ENABLE_FEATURE_DHCP4o6C
 	if (new_mode == LISTEN_KERNEL)
 		sockfd = udhcp_listen_socket(/*INADDR_ANY,*/ CLIENT_PORT, client_config.interface);
 	else if (new_mode != LISTEN_NONE)
 		sockfd = udhcp_raw_socket(client_config.ifindex);
 	/* else LISTEN_NONE: sockfd stays closed */
+#else
+	sockfd = dhcp4o6_open_socket(new_mode);
+#endif
 }
 
 /* Called only on SIGUSR1 */
@@ -1235,6 +1242,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 	uint8_t *temp, *message;
 	const char *str_V, *str_h, *str_F, *str_r;
 	IF_FEATURE_UDHCP_PORT(char *str_P;)
+//	IF_FEATURE_DHCP4o6C(char *str_6;)
 	void *clientid_mac_ptr;
 	llist_t *list_O = NULL;
 	llist_t *list_x = NULL;
@@ -1267,6 +1275,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 		USE_FOR_MMU("b")
 		IF_FEATURE_UDHCPC_ARPING("a")
 		IF_FEATURE_UDHCP_PORT("P:")
+		IF_FEATURE_DHCP4o6C("6")
 		"v"
 		, &str_V, &str_h, &str_h, &str_F
 		, &client_config.interface, &client_config.pidfile, &str_r /* i,p */
@@ -1275,6 +1284,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 		, &list_O
 		, &list_x
 		IF_FEATURE_UDHCP_PORT(, &str_P)
+//		IF_FEATURE_DHCP4o6C(, &str_6)
 		IF_UDHCP_VERBOSE(, &dhcp_verbose)
 	);
 	if (opt & (OPT_h|OPT_H)) {
@@ -1297,13 +1307,28 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 		/*client_config.fqdn[OPT_DATA + 1] = 0; - xzalloc did it */
 		/*client_config.fqdn[OPT_DATA + 2] = 0; */
 	}
+
+#if ENABLE_FEATURE_DHCP4o6C
+	client_config.mode4o6 = (opt & OPT_6);
+#endif
+
 	if (opt & OPT_r)
 		requested_ip = inet_addr(str_r);
 #if ENABLE_FEATURE_UDHCP_PORT
 	if (opt & OPT_P) {
 		CLIENT_PORT = xatou16(str_P);
 		SERVER_PORT = CLIENT_PORT - 1;
+#if ENABLE_FEATURE_DHCP4o6C
+		CLIENT_PORT6 = CLIENT_PORT;
+		SERVER_PORT6 = CLIENT_PORT6 + 1;
+#endif
 	}
+#if ENABLE_FEATURE_DHCP4o6C
+	else if (client_config.mode4o6) {
+		CLIENT_PORT6 = 546;
+		SERVER_PORT6 = 547;
+	}
+#endif
 #endif
 	while (list_O) {
 		char *optstr = llist_pop(&list_O);
@@ -1397,6 +1422,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 	for (;;) {
 		struct timeval tv;
 		struct dhcp_packet packet;
+		IF_FEATURE_DHCP4o6C(struct d6_packet *d6_pkt;)
 		/* silence "uninitialized!" warning */
 		unsigned timestamp_before_wait = timestamp_before_wait;
 
@@ -1597,6 +1623,11 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 			int len;
 
 			/* A packet is ready, read it */
+#if ENABLE_FEATURE_DHCP4o6C
+			if ( client_config.mode4o6 )
+				len = d6_recv_raw_packet(NULL,&d6_pkt,sockfd);
+			else
+#endif
 			if (listen_mode == LISTEN_KERNEL)
 				len = udhcp_recv_kernel_packet(&packet, sockfd);
 			else
@@ -1615,6 +1646,14 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 				continue;
 		}
 
+#if ENABLE_FEATURE_DHCP4o6C
+		if ( client_config.mode4o6 ) {
+			if ( get_dhcpv4_from_dhcpv6 (&d6_pkt, &packet) ) {
+				log1("Ignoring inadequate packet");
+				continue;
+			}
+		}
+#endif
 		if (packet.xid != xid) {
 			log1("xid %x (our is %x), ignoring packet",
 				(unsigned)packet.xid, (unsigned)xid);

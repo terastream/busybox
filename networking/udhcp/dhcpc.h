@@ -21,6 +21,8 @@ struct client_config_t {
 	uint8_t *hostname;              /* Optional hostname to use */
 	uint8_t *fqdn;                  /* Optional fully qualified domain name to use */
 
+	IF_FEATURE_DHCP4o6C(int mode4o6; /* Compile DHCPv4 over DHCPv6 */)
+
 	uint16_t first_secs;
 	uint16_t last_secs;
 } FIX_ALIASING;

@@ -91,6 +91,7 @@ enum {
 
 static void *d6_find_option(uint8_t *option, uint8_t *option_end, unsigned code)
 {
+#if !ENABLE_FEATURE_DHCP4o6C
 	/* "length minus 4" */
 	int len_m4 = option_end - option - 4;
 	while (len_m4 >= 0) {
@@ -110,6 +111,21 @@ static void *d6_find_option(uint8_t *option, uint8_t *option_end, unsigned code)
 		option += option[3] + 4;
 		len_m4 -= option[3] + 4;
 	}
+#else
+	/* D6_OPT_DHCPV4_MSG option is larger than 255 since whole DHCPv4
+	 * packet is in it, so the above assumptions are not valid */
+	unsigned opt_len, opt_code;
+	while (option < option_end) {
+		opt_len =  option[2]<<8 + option[3];
+		opt_code = option[0]<<8 + option[1];
+		if (option + 4 + opt_len > option_end)
+			return NULL; /* option not found */
+		/* Does its code match? */
+		if (opt_code == code)
+			return option; /* yes! */
+		option += opt_len;
+	}
+#endif
 	return NULL;
 }
 
@@ -639,6 +655,11 @@ static NOINLINE int d6_recv_raw_packet(struct in6_addr *peer_ipv6
 
 	bytes -= sizeof(packet.ip6) + sizeof(packet.udp);
 	memcpy(d6_pkt, &packet.data, bytes);
+
+#if ENABLE_FEATURE_DHCP4o6C
+	/* save DHCPv6 server address, for possible future usage by client */
+	server_config.dst_ipv6 = packet.ip6.ip6_dst;
+#endif
 	return bytes;
 }
 
@@ -694,7 +715,7 @@ static int d6_raw_socket(int ifindex)
 	 *
 	 * TODO: make conditional?
 	 */
-#if 0
+#if ENABLE_FEATURE_DHCP4o6C
 	static const struct sock_filter filter_instr[] = {
 		/* load 9th byte (protocol) */
 		BPF_STMT(BPF_LD|BPF_B|BPF_ABS, 9),
@@ -732,13 +753,15 @@ static int d6_raw_socket(int ifindex)
 	sock.sll_ifindex = ifindex;
 	xbind(fd, (struct sockaddr *) &sock, sizeof(sock));
 
-#if 0
+#if ENABLE_FEATURE_DHCP4o6C
 	if (CLIENT_PORT6 == 546) {
 		/* Use only if standard port is in use */
 		/* Ignoring error (kernel may lack support for this) */
 		if (setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, &filter_prog,
 				sizeof(filter_prog)) >= 0)
 			log1("Attached filter to raw socket fd %d", fd); // log?
+		else
+			log1("Error attaching filter to raw socket fd %d", fd);
 	}
 #endif
 
@@ -1490,3 +1513,71 @@ int udhcpc6_main(int argc UNUSED_PARAM, char **argv)
 		remove_pidfile(client_config.pidfile);
 	return retval;
 }
+
+
+
+#if ENABLE_FEATURE_DHCP4o6C
+/*
+ * DHCP4o6 helper functions
+ *
+ * We use a lot of above helper functions, here declared as static,
+ * so code is placed here and not in dhcpc.c.
+ */
+
+int get_dhcpv4_from_dhcpv6(struct d6_packet *d6_pkt, struct dhcp_packet *d4_pkt)
+{
+	uint8_t *d6opt;
+	unsigned opt_len;
+	/* check DHCPv6 packet in d6_pkt */
+
+	if ( packet->d6_msg_type != D6_MSG_DHCPV4_RESPONSE ) {
+		log1("Packet is not of D6_MSG_DHCPV4_RESPONSE type");
+		return -1;
+	}
+
+//	if ( clientid? iz client_config.negdje )
+//		return -1;
+
+	d6opt = d6_find_option ( d6_pkt->d6_options, d6_pkt+1, D6_OPT_DHCPV4_MSG );
+	if ( ! d6opt ) {
+		log1("D6_OPT_DHCPV4_MSG option not found");
+		return -1;
+	}
+
+	opt_len = d6opt[2]<<8 + d6opt[3];
+	if ( opt_len < sizeof (struct dhcp_packet) -
+		DHCP_OPTIONS_BUFSIZE - CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS ) {
+		log1("D6_OPT_DHCPV4_MSG option too small");
+		return -1;
+	}
+
+	/* extract dhcpv4 packet from dhcpv6 option */
+	memcpy ( d4_pkt, d6opt + 4, opt_len );
+
+	return 0;
+}
+
+int dhcp4o6_open_socket(int mode)
+{
+	int sockfd6 = -1;
+
+#if 0	/* FIXME? */
+	if (mode == LISTEN_KERNEL)
+		sockfd6 = d6_listen_socket(/*INADDR_ANY,*/ CLIENT_PORT6,
+					      client_config.interface);
+	else if (mode != LISTEN_NONE)
+#endif
+		sockfd6 = d6_raw_socket(client_config.ifindex);
+	/* else LISTEN_NONE: sockfd stays closed */
+
+	return sockfd6;
+}
+
+int dhcp4o6_recv_raw_packet (struct in6_addr *peer_ipv6
+	UNUSED_PARAM
+	, struct d6_packet *d6_pkt, int fd)
+{
+	return d6_recv_raw_packet(peer_ipv6,&d6_pkt,sockfd);
+}
+
+#endif

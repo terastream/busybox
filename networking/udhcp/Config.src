@@ -152,3 +152,13 @@ config UDHCPC_SLACK_FOR_BUGGY_SERVERS
 	    maximum size of entire IP packet, and sends packets which are
 	    28 bytes too large.
 	  Seednet (ISP) VDSL: sends packets 2 bytes too large.
+
+config FEATURE_DHCP4o6C
+	bool "Use DHCPv4 over DHCPv6"
+	default y
+	depends on UDHCPC
+	help
+	  If selected, DHCPv4 over DHCPv6 will be compiled in udhcpc.
+	  However, to activate this mechanism flag -6 must be used when
+	  starting udhcpc.
+
