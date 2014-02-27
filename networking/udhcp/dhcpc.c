@@ -664,18 +664,39 @@ static void add_client_options(struct dhcp_packet *packet)
 
 static int raw_bcast_from_client_config_ifindex(struct dhcp_packet *packet)
 {
+#if ENABLE_FEATURE_DHCP4o6C
+	if ( !client_config.mode4o6 )
+#endif
 	return udhcp_send_raw_packet(packet,
 		/*src*/ INADDR_ANY, CLIENT_PORT,
 		/*dst*/ INADDR_BROADCAST, SERVER_PORT, MAC_BCAST_ADDR,
 		client_config.ifindex);
+#if ENABLE_FEATURE_DHCP4o6C
+	else
+	return dhcp4o6_send_raw_packet(packet,
+		/*src*/ INADDR_ANY, CLIENT_PORT6,
+		/*dst*/ INADDR_BROADCAST, SERVER_PORT6, MAC_BCAST_ADDR,
+		client_config.ifindex);
+#endif
 }
 
 static int bcast_or_ucast(struct dhcp_packet *packet, uint32_t ciaddr, uint32_t server)
 {
 	if (server)
+#if ENABLE_FEATURE_DHCP4o6C
+	{
+		if ( !client_config.mode4o6 )
+#endif
 		return udhcp_send_kernel_packet(packet,
 			ciaddr, CLIENT_PORT,
 			server, SERVER_PORT);
+#if ENABLE_FEATURE_DHCP4o6C
+		else
+		return dhcp4o6_send_kernel_packet(packet,
+			ciaddr, CLIENT_PORT,
+			server, SERVER_PORT);
+	}
+#endif
 	return raw_bcast_from_client_config_ifindex(packet);
 }
 
@@ -1310,6 +1331,8 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 
 #if ENABLE_FEATURE_DHCP4o6C
 	client_config.mode4o6 = (opt & OPT_6);
+	if ( client_config.mode4o6 )
+		client_config.xid6 = 0;
 #endif
 
 	if (opt & OPT_r)
@@ -1648,7 +1671,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 
 #if ENABLE_FEATURE_DHCP4o6C
 		if ( client_config.mode4o6 ) {
-			if ( get_dhcpv4_from_dhcpv6 (&d6_pkt, &packet) ) {
+			if ( dhcp4o6_get_dhcpv4_from_dhcpv6 (&d6_pkt, &packet) ) {
 				log1("Ignoring inadequate packet");
 				continue;
 			}

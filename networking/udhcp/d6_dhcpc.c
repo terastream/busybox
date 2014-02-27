@@ -1524,7 +1524,7 @@ int udhcpc6_main(int argc UNUSED_PARAM, char **argv)
  * so code is placed here and not in dhcpc.c.
  */
 
-int get_dhcpv4_from_dhcpv6(struct d6_packet *d6_pkt, struct dhcp_packet *d4_pkt)
+int dhcp4o6_get_dhcpv4_from_dhcpv6(struct d6_packet *d6_pkt, struct dhcp_packet *d4_pkt)
 {
 	uint8_t *d6opt;
 	unsigned opt_len;
@@ -1545,8 +1545,7 @@ int get_dhcpv4_from_dhcpv6(struct d6_packet *d6_pkt, struct dhcp_packet *d4_pkt)
 	}
 
 	opt_len = d6opt[2]<<8 + d6opt[3];
-	if ( opt_len < sizeof (struct dhcp_packet) -
-		DHCP_OPTIONS_BUFSIZE - CONFIG_UDHCPC_SLACK_FOR_BUGGY_SERVERS ) {
+	if ( opt_len < DHCP_SIZE ) {
 		log1("D6_OPT_DHCPV4_MSG option too small");
 		return -1;
 	}
@@ -1580,4 +1579,49 @@ int dhcp4o6_recv_raw_packet (struct in6_addr *peer_ipv6
 	return d6_recv_raw_packet(peer_ipv6,&d6_pkt,sockfd);
 }
 
+int dhcp4o6_send_raw_packet (struct dhcp_packet *dhcp_pkt,
+		uint32_t source_nip, int source_port,
+		uint32_t dest_nip, int dest_port, const uint8_t *dest_arp,
+		int ifindex)
+{
+	struct d6_packet packet;
+	struct d6_option *opt;
+	uint8_t *opt8;
+	uint size;
+
+	if ( client_config.xid6 == 0 )
+		client_config.xid6 = random_xid();
+
+	/* create DHCPv6 packet of type D6_MSG_DHCPV4_QUERY */
+	opt8 = opt = init_d6_packet ( &packet, D6_OPT_DHCPV4_MSG, client_config.xid6 );
+
+	//to be continued... (tommorrow; ops later today)
+
+
+
+}
+int dhcp4o6_send_kernel_packet (struct dhcp_packet *dhcp_pkt,
+		uint32_t source_nip, int source_port,
+		uint32_t dest_nip, int dest_port)
+{
+	/* FIXME? */
+	return dhcp4o6_send_raw_packet(dhcp_pkt,
+			source_nip, source_port,
+			dest_nip, dest_port,
+			MAC_BCAST_ADDR, client_config.ifindex);
+}
+
 #endif
+
+static uint8_t *init_d6_packet(struct d6_packet *packet, char type, uint32_t xid)
+{
+	struct d6_option *clientid;
+
+	memset(packet, 0, sizeof(*packet));
+
+	packet->d6_xid32 = xid;
+	packet->d6_msg_type = type;
+
+	clientid = (void*)client_config.clientid;
+	return d6_store_blob(packet->d6_options, clientid, clientid->len + 2+2);
+}
