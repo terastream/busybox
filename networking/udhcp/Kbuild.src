@@ -19,3 +19,5 @@ lib-$(CONFIG_DHCPRELAY)  += dhcprelay.o
 
 lib-$(CONFIG_FEATURE_UDHCPC_ARPING) += arpping.o
 lib-$(CONFIG_FEATURE_UDHCP_RFC3397) += domain_codec.o
+
+lib-$(CONFIG_FEATURE_DHCP4o6C) += dhcp4o6.o d6_packet.o d6_socket.o

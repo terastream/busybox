@@ -29,11 +29,6 @@ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
 #define D6_MSG_RELAY_FORW          12
 #define D6_MSG_RELAY_REPL          13
 
-#if ENABLE_FEATURE_DHCP4o6C
-#define D6_MSG_DHCPV4_QUERY        (D6_MSG_RELAY_REPL+1)
-#define D6_MSG_DHCPV4_RESPONSE     (D6_MSG_RELAY_REPL+2)
-#endif
-
 struct d6_packet {
 	union {
 		uint8_t d6_msg_type;
@@ -88,10 +83,6 @@ struct d6_option {
 
 #define D6_OPT_IA_PD         25
 #define D6_OPT_IAPREFIX      26
-
-#if ENABLE_FEATURE_DHCP4o6C
-#define D6_OPT_DHCPV4_MSG	(D6_OPT_IAPREFIX+1)
-#endif
 
 /*** Other shared functions ***/
 

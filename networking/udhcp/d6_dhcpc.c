@@ -91,7 +91,6 @@ enum {
 
 static void *d6_find_option(uint8_t *option, uint8_t *option_end, unsigned code)
 {
-#if !ENABLE_FEATURE_DHCP4o6C
 	/* "length minus 4" */
 	int len_m4 = option_end - option - 4;
 	while (len_m4 >= 0) {
@@ -111,21 +110,6 @@ static void *d6_find_option(uint8_t *option, uint8_t *option_end, unsigned code)
 		option += option[3] + 4;
 		len_m4 -= option[3] + 4;
 	}
-#else
-	/* D6_OPT_DHCPV4_MSG option is larger than 255 since whole DHCPv4
-	 * packet is in it, so the above assumptions are not valid */
-	unsigned opt_len, opt_code;
-	while (option < option_end) {
-		opt_len =  option[2]<<8 + option[3];
-		opt_code = option[0]<<8 + option[1];
-		if (option + 4 + opt_len > option_end)
-			return NULL; /* option not found */
-		/* Does its code match? */
-		if (opt_code == code)
-			return option; /* yes! */
-		option += opt_len;
-	}
-#endif
 	return NULL;
 }
 
@@ -658,7 +642,8 @@ static NOINLINE int d6_recv_raw_packet(struct in6_addr *peer_ipv6
 
 #if ENABLE_FEATURE_DHCP4o6C
 	/* save DHCPv6 server address, for possible future usage by client */
-	server_config.dst_ipv6 = packet.ip6.ip6_dst;
+	memcpy ( server_config.dst_ipv6, packet.ip6.ip6_dst.s6_addr, 16 );
+	/* FIXME is this required? */
 #endif
 	return bytes;
 }
@@ -715,7 +700,7 @@ static int d6_raw_socket(int ifindex)
 	 *
 	 * TODO: make conditional?
 	 */
-#if ENABLE_FEATURE_DHCP4o6C
+#if 0
 	static const struct sock_filter filter_instr[] = {
 		/* load 9th byte (protocol) */
 		BPF_STMT(BPF_LD|BPF_B|BPF_ABS, 9),
@@ -753,7 +738,7 @@ static int d6_raw_socket(int ifindex)
 	sock.sll_ifindex = ifindex;
 	xbind(fd, (struct sockaddr *) &sock, sizeof(sock));
 
-#if ENABLE_FEATURE_DHCP4o6C
+#if 0
 	if (CLIENT_PORT6 == 546) {
 		/* Use only if standard port is in use */
 		/* Ignoring error (kernel may lack support for this) */
@@ -1513,119 +1498,3 @@ int udhcpc6_main(int argc UNUSED_PARAM, char **argv)
 		remove_pidfile(client_config.pidfile);
 	return retval;
 }
-
-
-
-#if ENABLE_FEATURE_DHCP4o6C
-/*
- * DHCP4o6 helper functions
- *
- * We use a lot of above helper functions, here declared as static,
- * so code is placed here and not in dhcpc.c.
- */
-
-int dhcp4o6_get_dhcpv4_from_dhcpv6(struct d6_packet *d6_pkt, struct dhcp_packet *d4_pkt)
-{
-	uint8_t *d6opt;
-	unsigned opt_len;
-	/* check DHCPv6 packet in d6_pkt */
-
-	if ( packet->d6_msg_type != D6_MSG_DHCPV4_RESPONSE ) {
-		log1("Packet is not of D6_MSG_DHCPV4_RESPONSE type");
-		return -1;
-	}
-
-//	if ( clientid? iz client_config.negdje )
-//		return -1;
-
-	d6opt = d6_find_option ( d6_pkt->d6_options, d6_pkt+1, D6_OPT_DHCPV4_MSG );
-	if ( ! d6opt ) {
-		log1("D6_OPT_DHCPV4_MSG option not found");
-		return -1;
-	}
-
-	opt_len = d6opt[2]<<8 + d6opt[3];
-	if ( opt_len < DHCP_SIZE ) {
-		log1("D6_OPT_DHCPV4_MSG option too small");
-		return -1;
-	}
-
-	/* extract dhcpv4 packet from dhcpv6 option */
-	memcpy ( d4_pkt, d6opt + 4, opt_len );
-
-	return 0;
-}
-
-int dhcp4o6_open_socket(int mode)
-{
-	int sockfd6 = -1;
-
-#if 0	/* FIXME? */
-	if (mode == LISTEN_KERNEL)
-		sockfd6 = d6_listen_socket(/*INADDR_ANY,*/ CLIENT_PORT6,
-					      client_config.interface);
-	else if (mode != LISTEN_NONE)
-#endif
-		sockfd6 = d6_raw_socket(client_config.ifindex);
-	/* else LISTEN_NONE: sockfd stays closed */
-
-	return sockfd6;
-}
-
-int dhcp4o6_recv_raw_packet (struct in6_addr *peer_ipv6
-	UNUSED_PARAM
-	, struct d6_packet *d6_pkt, int fd)
-{
-	return d6_recv_raw_packet(peer_ipv6,&d6_pkt,sockfd);
-}
-
-int dhcp4o6_send_kernel_packet (struct dhcp_packet *dhcp_pkt,
-		uint32_t source_nip, int source_port,
-		uint32_t dest_nip, int dest_port)
-{
-	/* FIXME? */
-	return dhcp4o6_send_raw_packet(dhcp_pkt,
-			source_nip, source_port,
-			dest_nip, dest_port,
-			MAC_BCAST_ADDR, client_config.ifindex);
-}
-
-int dhcp4o6_send_raw_packet (struct dhcp_packet *packet4,
-		uint32_t source_nip, int source_port,
-		uint32_t dest_nip, int dest_port, const uint8_t *dest_arp,
-		int ifindex)
-{
-	struct d6_packet packet6; /* is packet large enough? */
-	struct d6_option *opt;
-	uint8_t *d6end;
-	uint d4size, d6size;
-
-	d4size = offsetof(struct dhcp_packet, options) + 
-			udhcp_end_option (packet4->options);
-	
-	if ( client_config.xid6 == 0 )
-		client_config.xid6 = random_xid();
-
-	/* create DHCPv6 packet of type D6_MSG_DHCPV4_QUERY */
-	opt = init_d6_packet ( &packet6, D6_OPT_DHCPV4_MSG, client_config.xid6 );
-
-	/* content of DHCPv6 packet is option D6_OPT_DHCPV4_MSG with DHCPv4 packet */
-	opt->code_hi = 0;
-	opt->code = D6_OPT_DHCPV4_MSG;
-	opt->len_hi = d4size >> 8;
-	opt->len = d4size & 0x00ff;
-	memcpy ( opt->data, packet4, d4size );
-
-	/* send packet */
-	d6size = 32 + 32 + d4size; /* d6 header + option header + d4 packet */
-	d6end = ((uint8_t *)&packet6) + d6size;
-
-	return d6_send_raw_packet(
-		packet6, d6size,
-		/*src*/ NULL, source_port, /* FIXME: can we get source ipv6? */
-		/*dst*/ &server_config.dst_ipv6, dest_port, dest_arp,
-		ifindex
-	);
-}
-
-#endif

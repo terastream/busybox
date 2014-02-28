@@ -55,9 +55,6 @@ struct server_config_t {
 	char *sname;                    /* bootp server name */
 	char *boot_file;                /* bootp boot file option */
 	struct static_lease *static_leases; /* List of ip/mac pairs to assign static leases */
-#if ENABLE_FEATURE_DHCP4o6C
-	struct in6_addr dst_ipv6;	/* IPv6 address of coresponding DHCP4o6 server */
-#endif
 } FIX_ALIASING;
 
 #define server_config (*(struct server_config_t*)&bb_common_bufsiz1)
