@@ -1331,8 +1331,14 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 
 #if ENABLE_FEATURE_DHCP4o6C
 	client_config.mode4o6 = (opt & OPT_6);
-	if ( client_config.mode4o6 )
+	if ( client_config.mode4o6 ) {
+		static const uint8_t FF02__1_2[16] = {
+			0xFF, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x02,
+		};
+		memcpy ( &server_config.dst_ipv6, FF02__1_2, 16 );
 		client_config.xid6 = 0;
+	}
 #endif
 
 	if (opt & OPT_r)
