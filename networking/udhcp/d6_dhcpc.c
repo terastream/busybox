@@ -640,11 +640,6 @@ static NOINLINE int d6_recv_raw_packet(struct in6_addr *peer_ipv6
 	bytes -= sizeof(packet.ip6) + sizeof(packet.udp);
 	memcpy(d6_pkt, &packet.data, bytes);
 
-#if ENABLE_FEATURE_DHCP4o6C
-	/* save DHCPv6 server address, for possible future usage by client */
-	memcpy ( server_config.dst_ipv6, packet.ip6.ip6_dst.s6_addr, 16 );
-	/* FIXME is this required? */
-#endif
 	return bytes;
 }
 
@@ -745,8 +740,6 @@ static int d6_raw_socket(int ifindex)
 		if (setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, &filter_prog,
 				sizeof(filter_prog)) >= 0)
 			log1("Attached filter to raw socket fd %d", fd); // log?
-		else
-			log1("Error attaching filter to raw socket fd %d", fd);
 	}
 #endif
 
