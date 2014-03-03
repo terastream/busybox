@@ -20,8 +20,9 @@ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
 #define MODE4o6_KERNEL_MODE  8
 
 /* DHCPv4o6 message types */
-#define D6_MSG_DHCPV4_QUERY        (D6_MSG_RELAY_REPL+1)
-#define D6_MSG_DHCPV4_RESPONSE     (D6_MSG_RELAY_REPL+2)
+#define D6_MSG_DHCPV4_QUERY        32
+#define D6_MSG_DHCPV4_RESPONSE     33
+
 /* DHCPv4o6 option */
 #define D6_OPT_DHCPV4_MSG          0xfe
 
