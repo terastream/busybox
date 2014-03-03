@@ -60,8 +60,8 @@ static const char udhcpc_longopts[] ALIGN1 =
 	"broadcast\0"      No_argument       "B"
 	IF_FEATURE_UDHCPC_ARPING("arping\0"	No_argument       "a")
 	IF_FEATURE_UDHCP_PORT("client-port\0"	Required_argument "P")
-	IF_FEATURE_DHCP4o6C("dhcp4o6\0"		No_argument       "6")
-	IF_FEATURE_DHCP4o6C("4o6-server\0"	Required_argument       "I")
+	IF_FEATURE_DHCP4o6C("dhcp4o6\0"		Required_argument       "6")
+	IF_FEATURE_DHCP4o6C("client-ipv6\0"	Required_argument       "I")
 	;
 #endif
 /* Must match getopt32 option string order */
@@ -1202,8 +1202,8 @@ static void client_background(void)
 //usage:     "\n	-b,--background		Background if lease is not obtained"
 //usage:	)
 //usage:	IF_FEATURE_DHCP4o6C(
-//usage:     "\n	-6		DHCP4o6 mode"
-//usage:     "\n	-I sIP		DHCP4o6 server IPv6 address"
+//usage:     "\n	-6 sIPv6		Use DHCP4o6 mode and DHCP4o6 server"
+//usage:     "\n	-I cIPv6		Client IPv6 address for DHCPv4o6 usage"
 //usage:	)
 //usage:     "\n	-S,--syslog		Log to syslog too"
 //usage:	IF_FEATURE_UDHCPC_ARPING(
@@ -1244,8 +1244,8 @@ static void client_background(void)
 //usage:	)
 //usage:     "\n	-S		Log to syslog too"
 //usage:	IF_FEATURE_DHCP4o6C(
-//usage:     "\n	-6		DHCP4o6 mode"
-//usage:     "\n	-I sIP		DHCP4o6 server IPv6 address"
+//usage:     "\n	-6 sIPv6		Use DHCP4o6 mode and DHCP4o6 server"
+//usage:     "\n	-I cIPv6		Client IPv6 address for DHCPv4o6 usage"
 //usage:	)
 //usage:	IF_FEATURE_UDHCPC_ARPING(
 //usage:     "\n	-a		Use arping to validate offered address"
@@ -1276,7 +1276,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 	uint8_t *temp, *message;
 	const char *str_V, *str_h, *str_F, *str_r;
 	IF_FEATURE_UDHCP_PORT(char *str_P;)
-	IF_FEATURE_DHCP4o6C(char *str_6d;)
+	IF_FEATURE_DHCP4o6C(char *str_6c, *str_6s;)
 	void *clientid_mac_ptr;
 	llist_t *list_O = NULL;
 	llist_t *list_x = NULL;
@@ -1309,7 +1309,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 		USE_FOR_MMU("b")
 		IF_FEATURE_UDHCPC_ARPING("a")
 		IF_FEATURE_UDHCP_PORT("P:")
-		IF_FEATURE_DHCP4o6C("6")
+		IF_FEATURE_DHCP4o6C("6:")
 		IF_FEATURE_DHCP4o6C("I:")
 		"v"
 		, &str_V, &str_h, &str_h, &str_F
@@ -1319,7 +1319,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 		, &list_O
 		, &list_x
 		IF_FEATURE_UDHCP_PORT(, &str_P)
-		IF_FEATURE_DHCP4o6C(, &str_6d)
+		IF_FEATURE_DHCP4o6C(, &str_6s, &str_6c)
 		IF_UDHCP_VERBOSE(, &dhcp_verbose)
 	);
 	if (opt & (OPT_h|OPT_H)) {
@@ -1438,10 +1438,12 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 #if ENABLE_FEATURE_DHCP4o6C
 	if ( (opt & OPT_6) ) {
 		client_config.mode4o6 = 1;
+		if ( !(opt & OPT_I) )
+			str_6c = NULL;
 #if ENABLE_FEATURE_UDHCP_PORT
-		dhcp4o6_init ((opt & OPT_P), (opt & OPT_I), str_6d);
+		dhcp4o6_init ((opt & OPT_P), str_6c, str_6s);
 #else
-		dhcp4o6_init (0, (opt & OPT_I), str_6d);
+		dhcp4o6_init (0, str_6c, str_6s);
 #endif
 	}
 #endif

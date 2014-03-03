@@ -256,7 +256,8 @@ static int d6_raw_socket(int ifindex)
 /*** DHCP4o6 utility functions ***/
 
 /* init dhcp4o6 data structure */
-int dhcp4o6_init (int port, int server, char *str_6d)
+
+int dhcp4o6_init (int port, char *cip6, char *sip6)
 {
 	struct in6_addr ip6;
 
@@ -272,19 +273,18 @@ int dhcp4o6_init (int port, int server, char *str_6d)
 		dhcp4o6_data.dst_port = 547;
 	}
 
-	if (server && str_6d && inet_pton(AF_INET6, str_6d, &ip6) > 0) {
+	if (cip6 && inet_pton(AF_INET6, cip6, &ip6) > 0)
+		dhcp4o6_data.src_ip = ip6;
+
+	if (sip6 && inet_pton(AF_INET6, sip6, &ip6) > 0) {
 		dhcp4o6_data.dst_ip = ip6;
 	}
 	else {
-#if 0	/* this should be activated (by rfc & draft)! */
-		bb_error_msg_and_die("bad IPv6 address for DHCP4o6 server '%s'", str_6d);
-#else
 		/* server address = multicast address = FF02__1_2 */
 		dhcp4o6_data.dst_ip.s6_addr[0] = 0xFF;
 		dhcp4o6_data.dst_ip.s6_addr[1] = 0x02;
 		dhcp4o6_data.dst_ip.s6_addr[13] = 0x01;
 		dhcp4o6_data.dst_ip.s6_addr[15] = 0x02;
-#endif
 	}
 
 	//FIXME choose between SOCKET_RAW and SOCKET_KERNEL with additional flag!
@@ -409,3 +409,42 @@ int dhcp4o6_send_packet (struct dhcp_packet *packet4, int bcast )
 		return -1;
 	}
 }
+
+#if 0 /* get local ipv6 address */
+
+#include <sys/types.h>
+#include <ifaddrs.h>
+
+static int dhcp4o6_get_client_addr (void)
+{
+	struct ifaddrs *ifaddr, *ifa;
+	char host[NI_MAXHOST];
+	int s;
+
+	if (getifaddrs(&ifaddr) == -1) {
+		log1("getifaddrs failure");
+		return -1;
+	}
+
+	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+		if (
+			ifa->ifa_addr == NULL ||
+			strcmp ( client_config.interface, ifa->ifa_name ) != 0 ||
+			ifa->ifa_addr->sa_family != AF_INET6
+		)
+			continue;
+
+		s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in6),
+                        host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+                if (s != 0)
+			continue;
+
+		log1("\taddress: <%s>\n", host);
+
+	}
+
+	freeifaddrs(ifaddr);
+
+	return 0;
+}
+#endif
