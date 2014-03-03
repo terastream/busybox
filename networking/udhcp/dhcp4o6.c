@@ -394,7 +394,7 @@ int dhcp4o6_send_packet (struct dhcp_packet *packet4, int bcast )
 	if (dhcp4o6_data.socket_mode == SOCKET_RAW)
 		return d6_send_raw_packet(
 			&packet6, d6size,
-			/*src*/ NULL, dhcp4o6_data.src_port, /* FIXME: can we get source ipv6? */
+			/*src*/ &dhcp4o6_data.src_ip, dhcp4o6_data.src_port,
 			/*dst*/ &dhcp4o6_data.dst_ip, dhcp4o6_data.dst_port,
 			MAC_BCAST_ADDR, client_config.ifindex
 		);
