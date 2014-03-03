@@ -23,7 +23,7 @@ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
 #define D6_MSG_DHCPV4_QUERY        (D6_MSG_RELAY_REPL+1)
 #define D6_MSG_DHCPV4_RESPONSE     (D6_MSG_RELAY_REPL+2)
 /* DHCPv4o6 option */
-#define D6_OPT_DHCPV4_MSG          (D6_OPT_IAPREFIX+1)
+#define D6_OPT_DHCPV4_MSG          0xfe
 
 /* send/recv/listen modes */
 #define SOCKET_NONE   0
@@ -46,7 +46,7 @@ struct dhcp4o6_data_t {
 #define dhcp4o6_data (*(struct dhcp4o6_data_t*)(&bb_common_bufsiz1[COMMON_BUFSIZE - sizeof(struct dhcp4o6_data_t)]))
 
 
-int dhcp4o6_init (int port, char *str_6d);
+int dhcp4o6_init (int port, int server, char *str_6d);
 int dhcp4o6_open_socket(int mode UNUSED_PARAM);
 int dhcp4o6_send_packet (struct dhcp_packet *packet4, int bcast );
 int dhcp4o6_recv_packet (struct dhcp_packet *packet, int fd);

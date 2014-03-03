@@ -24,9 +24,9 @@
 
 /*** Utility functions borrowed from d6_dhcpc.c ***/
 static void *d6_find_option(uint8_t *option, uint8_t *option_end, unsigned code);
-static void *d6_store_blob(void *dst, const void *src, unsigned len);
+//static void *d6_store_blob(void *dst, const void *src, unsigned len);
 static uint8_t *init_d6_packet(struct d6_packet *packet, char type, uint32_t xid);
-static uint8_t *add_d6_client_options(uint8_t *ptr);
+//static uint8_t *add_d6_client_options(uint8_t *ptr);
 static NOINLINE int d6_recv_raw_packet(struct d6_packet *d6_pkt, int fd);
 static int d6_raw_socket(int ifindex);
 
@@ -71,29 +71,20 @@ static void *d6_find_option(uint8_t *option, uint8_t *option_end, unsigned code)
 	return NULL;
 }
 
-static void *d6_store_blob(void *dst, const void *src, unsigned len)
-{
-	memcpy(dst, src, len);
-	return dst + len;
-}
-
-
 /*** Sending/receiving packets ***/
 
 /* Initialize the packet with the proper defaults */
 static uint8_t *init_d6_packet(struct d6_packet *packet, char type, uint32_t xid)
 {
-	struct d6_option *clientid;
-
 	memset(packet, 0, sizeof(*packet));
 
 	packet->d6_xid32 = xid;
 	packet->d6_msg_type = type;
 
-	clientid = (void*)client_config.clientid;
-	return d6_store_blob(packet->d6_options, clientid, clientid->len + 2+2);
+	return (void *) packet->d6_options;
 }
 
+#if 0
 static uint8_t *add_d6_client_options(uint8_t *ptr)
 {
 	return ptr;
@@ -108,6 +99,7 @@ static uint8_t *add_d6_client_options(uint8_t *ptr)
 	/* Add -x options if any */
 	//...
 }
+#endif
 
 /* Returns -1 on errors that are fatal for the socket, -2 for those that aren't */
 /* NOINLINE: limit stack usage in caller */
@@ -264,7 +256,7 @@ static int d6_raw_socket(int ifindex)
 /*** DHCP4o6 utility functions ***/
 
 /* init dhcp4o6 data structure */
-int dhcp4o6_init (int port, char *str_6d)
+int dhcp4o6_init (int port, int server, char *str_6d)
 {
 	struct in6_addr ip6;
 
@@ -280,7 +272,7 @@ int dhcp4o6_init (int port, char *str_6d)
 		dhcp4o6_data.dst_port = 547;
 	}
 
-	if (str_6d && inet_pton(AF_INET6, str_6d, &ip6) > 0) {
+	if (server && str_6d && inet_pton(AF_INET6, str_6d, &ip6) > 0) {
 		dhcp4o6_data.dst_ip = ip6;
 	}
 	else {
@@ -384,7 +376,7 @@ int dhcp4o6_send_packet (struct dhcp_packet *packet4, int bcast )
 		flags = htonl(0x00800000); /* unicast flag */
 
 	d4size = offsetof(struct dhcp_packet, options) +
-			udhcp_end_option (packet4->options);
+			udhcp_end_option (packet4->options) + 1;
 
 	/* create DHCPv6 packet of type D6_MSG_DHCPV4_QUERY */
 	opt = (void *) init_d6_packet ( &packet6, D6_MSG_DHCPV4_QUERY, flags );
@@ -396,7 +388,7 @@ int dhcp4o6_send_packet (struct dhcp_packet *packet4, int bcast )
 	opt->len = d4size & 0x00ff;
 	memcpy ( opt->data, packet4, d4size );
 
-	d6size = 32 + 32 + d4size; /* d6 header + option header + d4 packet */
+	d6size = 4 + 4 + d4size; /* d6 header + option header + d4 packet */
 
 	/* send packet */
 	if (dhcp4o6_data.socket_mode == SOCKET_RAW)
