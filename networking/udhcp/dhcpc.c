@@ -1415,6 +1415,19 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 		logmode |= LOGMODE_SYSLOG;
 	}
 
+#if ENABLE_FEATURE_DHCP4o6C
+	if ( (opt & OPT_6) ) {
+		client_config.mode4o6 = 1;
+		if ( !(opt & OPT_I) )
+			str_6c = NULL;
+#if ENABLE_FEATURE_UDHCP_PORT
+		dhcp4o6_init ((opt & OPT_P), str_6c, str_6s);
+#else
+		dhcp4o6_init (0, str_6c, str_6s);
+#endif
+	}
+#endif
+
 	/* Make sure fd 0,1,2 are open */
 	bb_sanitize_stdio();
 	/* Equivalent of doing a fflush after every \n */
@@ -1434,19 +1447,6 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 	packet_num = 0;
 	timeout = 0;
 	already_waited_sec = 0;
-
-#if ENABLE_FEATURE_DHCP4o6C
-	if ( (opt & OPT_6) ) {
-		client_config.mode4o6 = 1;
-		if ( !(opt & OPT_I) )
-			str_6c = NULL;
-#if ENABLE_FEATURE_UDHCP_PORT
-		dhcp4o6_init ((opt & OPT_P), str_6c, str_6s);
-#else
-		dhcp4o6_init (0, str_6c, str_6s);
-#endif
-	}
-#endif
 
 	/* Main event loop. select() waits on signal pipe and possibly
 	 * on sockfd.

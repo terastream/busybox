@@ -288,7 +288,8 @@ int dhcp4o6_init (int port, char *cip6, char *sip6)
 	}
 
 	//FIXME choose between SOCKET_RAW and SOCKET_KERNEL with additional flag!
-	dhcp4o6_data.socket_mode = SOCKET_RAW;
+//	dhcp4o6_data.socket_mode = SOCKET_RAW;
+	dhcp4o6_data.socket_mode = SOCKET_KERNEL;
 
 	return 0;
 }
