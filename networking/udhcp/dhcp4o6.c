@@ -159,7 +159,7 @@ static NOINLINE int d6_recv_raw_packet(struct d6_packet *d6_pkt, int fd)
 	memcpy(d6_pkt, &packet.data, bytes);
 
 	/* save DHCPv6 server address, for possible future usage by client */
-	dhcp4o6_data.dst_ip = packet.ip6.ip6_src;
+	//dhcp4o6_data.dst_ip = packet.ip6.ip6_src;
 	/* FIXME is this required? */
 
 	return bytes;
@@ -197,8 +197,24 @@ static int d6_raw_socket(int ifindex)
 	 *
 	 * TODO: make conditional?
 	 */
+	/* from: tcpdump -dd udp and dst port 546 and src port 547 and ip6 */
+	static const struct sock_filter filter_instr[] =
 #if 1
-	static const struct sock_filter filter_instr[] = {
+	{
+		{ 0x28, 0, 0, 0x0000000c },
+		{ 0x15, 0, 7, 0x000086dd },
+		{ 0x30, 0, 0, 0x00000014 },
+		{ 0x15, 0, 5, 0x00000011 },
+		{ 0x28, 0, 0, 0x00000038 },
+		{ 0x15, 0, 3, 0x00000222 },
+		{ 0x28, 0, 0, 0x00000036 },
+		{ 0x15, 0, 1, 0x00000223 },
+		{ 0x6, 0, 0, 0x0000ffff },
+		{ 0x6, 0, 0, 0x00000000 },
+	};
+#endif
+#if 0
+	{
 		/* load 9th byte (protocol) */
 		BPF_STMT(BPF_LD|BPF_B|BPF_ABS, 9),
 		/* jump to L1 if it is IPPROTO_UDP, else to L4 */
@@ -212,18 +228,19 @@ static int d6_raw_socket(int ifindex)
 		/* load udp destination port from halfword[header_len + 2] */
 		BPF_STMT(BPF_LD|BPF_H|BPF_IND, 2),
 		/* jump to L3 if udp dport is CLIENT_PORT6, else to L4 */
-		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, 68, 0, 1),
+//		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, 68, 0, 1),
+		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, 546, 0, 1),
 		/* L3: accept packet */
 		BPF_STMT(BPF_RET|BPF_K, 0x7fffffff),
 		/* L4: discard packet */
 		BPF_STMT(BPF_RET|BPF_K, 0),
 	};
+#endif
 	static const struct sock_fprog filter_prog = {
 		.len = sizeof(filter_instr) / sizeof(filter_instr[0]),
 		/* casting const away: */
 		.filter = (struct sock_filter *) filter_instr,
 	};
-#endif
 
 	log1("Opening raw socket on ifindex %d", ifindex); //log2?
 
@@ -235,7 +252,7 @@ static int d6_raw_socket(int ifindex)
 	sock.sll_ifindex = ifindex;
 	xbind(fd, (struct sockaddr *) &sock, sizeof(sock));
 
-#if 1
+#if 0 /* not working! */
 	if (CLIENT_PORT6 == 546) {
 		/* Use only if standard port is in use */
 		/* Ignoring error (kernel may lack support for this) */
@@ -411,7 +428,7 @@ int dhcp4o6_send_packet (struct dhcp_packet *packet4, int bcast )
 	}
 }
 
-#if 0 /* get local ipv6 address */
+#if 0 /* TODO to get local ipv6 address "automatically", now its just a copy from man page */
 
 #include <sys/types.h>
 #include <ifaddrs.h>

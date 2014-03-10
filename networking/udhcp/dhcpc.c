@@ -1202,8 +1202,8 @@ static void client_background(void)
 //usage:     "\n	-b,--background		Background if lease is not obtained"
 //usage:	)
 //usage:	IF_FEATURE_DHCP4o6C(
-//usage:     "\n	-6 sIPv6		Use DHCP4o6 mode and DHCP4o6 server"
-//usage:     "\n	-I cIPv6		Client IPv6 address for DHCPv4o6 usage"
+//usage:     "\n	-6 sIPv6		Use DHCP4o6 mode and given DHCP4o6 server"
+//usage:     "\n	-I cIPv6		Client IPv6 address to use for DHCPv4o6"
 //usage:	)
 //usage:     "\n	-S,--syslog		Log to syslog too"
 //usage:	IF_FEATURE_UDHCPC_ARPING(
@@ -1244,8 +1244,8 @@ static void client_background(void)
 //usage:	)
 //usage:     "\n	-S		Log to syslog too"
 //usage:	IF_FEATURE_DHCP4o6C(
-//usage:     "\n	-6 sIPv6		Use DHCP4o6 mode and DHCP4o6 server"
-//usage:     "\n	-I cIPv6		Client IPv6 address for DHCPv4o6 usage"
+//usage:     "\n	-6 sIPv6		Use DHCP4o6 mode and given DHCP4o6 server"
+//usage:     "\n	-I cIPv6		Client IPv6 address to use for DHCPv4o6"
 //usage:	)
 //usage:	IF_FEATURE_UDHCPC_ARPING(
 //usage:     "\n	-a		Use arping to validate offered address"
