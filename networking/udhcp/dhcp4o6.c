@@ -22,11 +22,9 @@
 #include <linux/filter.h>
 
 
-/*** Utility functions borrowed from d6_dhcpc.c ***/
+/*** Utility functions borrowed from d6_dhcpc.c (and adapted if required) ***/
 static void *d6_find_option(uint8_t *option, uint8_t *option_end, unsigned code);
-//static void *d6_store_blob(void *dst, const void *src, unsigned len);
 static uint8_t *init_d6_packet(struct d6_packet *packet, char type, uint32_t xid);
-//static uint8_t *add_d6_client_options(uint8_t *ptr);
 static NOINLINE int d6_recv_raw_packet(struct d6_packet *d6_pkt, int fd);
 static int d6_raw_socket(int ifindex);
 
@@ -83,23 +81,6 @@ static uint8_t *init_d6_packet(struct d6_packet *packet, char type, uint32_t xid
 
 	return (void *) packet->d6_options;
 }
-
-#if 0
-static uint8_t *add_d6_client_options(uint8_t *ptr)
-{
-	return ptr;
-	//uint8_t c;
-	//int i, end, len;
-
-	/* Add a "param req" option with the list of options we'd like to have
-	 * from stubborn DHCP servers. Pull the data from the struct in common.c.
-	 * No bounds checking because it goes towards the head of the packet. */
-	//...
-
-	/* Add -x options if any */
-	//...
-}
-#endif
 
 /* Returns -1 on errors that are fatal for the socket, -2 for those that aren't */
 /* NOINLINE: limit stack usage in caller */
@@ -158,9 +139,16 @@ static NOINLINE int d6_recv_raw_packet(struct d6_packet *d6_pkt, int fd)
 	bytes -= sizeof(packet.ip6) + sizeof(packet.udp);
 	memcpy(d6_pkt, &packet.data, bytes);
 
-	/* save DHCPv6 server address, for possible future usage by client */
-	//dhcp4o6_data.dst_ip = packet.ip6.ip6_src;
-	/* FIXME is this required? */
+// Save DHCPv6 server address?
+//	Server address should be given at command line. If its not we use
+//	multicast on FF02__1_2. However, when server replies with *valid* reply
+//	we should use its address in future communication (not multicast).
+//	For example, we could define local variable "last_peer_ipv6", set its
+//	value here:
+//	last_peer_ipv6 = packet.ip6.ip6_src;
+//	validate received packet (in dhcp4o6_get_dhcpv4_from_dhcpv6?),
+//	and if its OK and dhcp4o6_data.dst_ip is multicast use last_peer_ipv6
+//	(dhcp4o6_data.dst_ip = last_peer_ipv6)
 
 	return bytes;
 }
@@ -273,7 +261,6 @@ static int d6_raw_socket(int ifindex)
 /*** DHCP4o6 utility functions ***/
 
 /* init dhcp4o6 data structure */
-
 int dhcp4o6_init (int port, char *cip6, char *sip6)
 {
 	struct in6_addr ip6;
@@ -290,18 +277,26 @@ int dhcp4o6_init (int port, char *cip6, char *sip6)
 		dhcp4o6_data.dst_port = 547;
 	}
 
-	if (cip6 && inet_pton(AF_INET6, cip6, &ip6) > 0)
-		dhcp4o6_data.src_ip = ip6;
+	if (!cip6 || inet_pton(AF_INET6, cip6, &ip6) != 1) {
+		bb_error_msg("Valid local (client) IPv6 address must be provided!");
+		exit(1);
+	}
+	dhcp4o6_data.src_ip = ip6;
 
 	if (sip6 && inet_pton(AF_INET6, sip6, &ip6) > 0) {
 		dhcp4o6_data.dst_ip = ip6;
 	}
-	else {
+	else if (strcmp(sip6, "mcast") == 0) {
 		/* server address = multicast address = FF02__1_2 */
 		dhcp4o6_data.dst_ip.s6_addr[0] = 0xFF;
 		dhcp4o6_data.dst_ip.s6_addr[1] = 0x02;
 		dhcp4o6_data.dst_ip.s6_addr[13] = 0x01;
 		dhcp4o6_data.dst_ip.s6_addr[15] = 0x02;
+	}
+	else {
+		bb_error_msg("Valid DHCP4oDHCP6 server IPv6 address must be "
+		"provided, or multicast specified by 'mcast' instead!");
+		exit(1);
 	}
 
 	//FIXME choose between SOCKET_RAW and SOCKET_KERNEL with additional flag!
@@ -427,42 +422,3 @@ int dhcp4o6_send_packet (struct dhcp_packet *packet4, int bcast )
 		return -1;
 	}
 }
-
-#if 0 /* TODO to get local ipv6 address "automatically", now its just a copy from man page */
-
-#include <sys/types.h>
-#include <ifaddrs.h>
-
-static int dhcp4o6_get_client_addr (void)
-{
-	struct ifaddrs *ifaddr, *ifa;
-	char host[NI_MAXHOST];
-	int s;
-
-	if (getifaddrs(&ifaddr) == -1) {
-		log1("getifaddrs failure");
-		return -1;
-	}
-
-	for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-		if (
-			ifa->ifa_addr == NULL ||
-			strcmp ( client_config.interface, ifa->ifa_name ) != 0 ||
-			ifa->ifa_addr->sa_family != AF_INET6
-		)
-			continue;
-
-		s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in6),
-                        host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-                if (s != 0)
-			continue;
-
-		log1("\taddress: <%s>\n", host);
-
-	}
-
-	freeifaddrs(ifaddr);
-
-	return 0;
-}
-#endif

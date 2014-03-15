@@ -44,6 +44,7 @@ struct dhcp4o6_data_t {
 	unsigned socket_mode; /* SOCKET_RAW, SOCKET_KERNEL */
 };
 
+/* dhcp4o6_data is placed at the end of bb_common_bufsiz1 */
 #define dhcp4o6_data (*(struct dhcp4o6_data_t*)(&bb_common_bufsiz1[COMMON_BUFSIZE - sizeof(struct dhcp4o6_data_t)]))
 
 

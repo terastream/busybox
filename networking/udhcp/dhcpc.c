@@ -674,10 +674,10 @@ static int raw_bcast_from_client_config_ifindex(struct dhcp_packet *packet)
 #if ENABLE_FEATURE_DHCP4o6C
 	if ( !client_config.mode4o6 )
 #endif
-		return udhcp_send_raw_packet(packet,
-			/*src*/ INADDR_ANY, CLIENT_PORT,
-			/*dst*/ INADDR_BROADCAST, SERVER_PORT, MAC_BCAST_ADDR,
-			client_config.ifindex);
+	return udhcp_send_raw_packet(packet,
+		/*src*/ INADDR_ANY, CLIENT_PORT,
+		/*dst*/ INADDR_BROADCAST, SERVER_PORT, MAC_BCAST_ADDR,
+		client_config.ifindex);
 #if ENABLE_FEATURE_DHCP4o6C
 	else
 		return dhcp4o6_send_packet (packet, 1);
@@ -691,9 +691,9 @@ static int bcast_or_ucast(struct dhcp_packet *packet, uint32_t ciaddr, uint32_t 
 	{
 		if ( !client_config.mode4o6 )
 #endif
-			return udhcp_send_kernel_packet(packet,
-				ciaddr, CLIENT_PORT,
-				server, SERVER_PORT);
+		return udhcp_send_kernel_packet(packet,
+			ciaddr, CLIENT_PORT,
+			server, SERVER_PORT);
 #if ENABLE_FEATURE_DHCP4o6C
 		else
 			return dhcp4o6_send_packet(packet, 0);
@@ -1202,8 +1202,9 @@ static void client_background(void)
 //usage:     "\n	-b,--background		Background if lease is not obtained"
 //usage:	)
 //usage:	IF_FEATURE_DHCP4o6C(
-//usage:     "\n	-6 sIPv6		Use DHCP4o6 mode and given DHCP4o6 server"
-//usage:     "\n	-I cIPv6		Client IPv6 address to use for DHCPv4o6"
+//usage:     "\n	-6,--dhcp4o6 SIP	Use DHCP4-over-DHCP6 mode with given"
+//usage:     "\n				server IPv6 address (or 'mcast' for multicast)"
+//usage:     "\n	-I,--client-ipv6 CIP	Client IPv6 address (for DHCP4-over-DHCP6 mode)"
 //usage:	)
 //usage:     "\n	-S,--syslog		Log to syslog too"
 //usage:	IF_FEATURE_UDHCPC_ARPING(
@@ -1244,8 +1245,9 @@ static void client_background(void)
 //usage:	)
 //usage:     "\n	-S		Log to syslog too"
 //usage:	IF_FEATURE_DHCP4o6C(
-//usage:     "\n	-6 sIPv6		Use DHCP4o6 mode and given DHCP4o6 server"
-//usage:     "\n	-I cIPv6		Client IPv6 address to use for DHCPv4o6"
+//usage:     "\n	-6,--dhcp4o6 SIP	Use DHCP4-over-DHCP6 mode with given"
+//usage:     "\n				server IPv6 address (or 'mcast' for multicast)"
+//usage:     "\n	-I,--client-ipv6 CIP	Client IPv6 address (for DHCP4-over-DHCP6 mode)"
 //usage:	)
 //usage:	IF_FEATURE_UDHCPC_ARPING(
 //usage:     "\n	-a		Use arping to validate offered address"
@@ -1309,8 +1311,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 		USE_FOR_MMU("b")
 		IF_FEATURE_UDHCPC_ARPING("a")
 		IF_FEATURE_UDHCP_PORT("P:")
-		IF_FEATURE_DHCP4o6C("6:")
-		IF_FEATURE_DHCP4o6C("I:")
+		IF_FEATURE_DHCP4o6C("6:I:")
 		"v"
 		, &str_V, &str_h, &str_h, &str_F
 		, &client_config.interface, &client_config.pidfile, &str_r /* i,p */

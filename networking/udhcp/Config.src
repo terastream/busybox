@@ -154,7 +154,7 @@ config UDHCPC_SLACK_FOR_BUGGY_SERVERS
 	  Seednet (ISP) VDSL: sends packets 2 bytes too large.
 
 config FEATURE_DHCP4o6C
-	bool "Use DHCPv4 over DHCPv6"
+	bool "Use DHCPv4 over DHCPv6 (client only)"
 	default y
 	depends on UDHCPC
 	help
