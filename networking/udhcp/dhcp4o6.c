@@ -189,16 +189,22 @@ static int d6_raw_socket(int ifindex)
 	static const struct sock_filter filter_instr[] =
 #if 1
 	{
-		{ 0x28, 0, 0, 0x0000000c },
-		{ 0x15, 0, 7, 0x000086dd },
-		{ 0x30, 0, 0, 0x00000014 },
-		{ 0x15, 0, 5, 0x00000011 },
-		{ 0x28, 0, 0, 0x00000038 },
-		{ 0x15, 0, 3, 0x00000222 },
-		{ 0x28, 0, 0, 0x00000036 },
-		{ 0x15, 0, 1, 0x00000223 },
-		{ 0x6, 0, 0, 0x0000ffff },
-		{ 0x6, 0, 0, 0x00000000 },
+		/* load 6th byte of IPv6 (protocol) */
+		BPF_STMT(BPF_LD|BPF_B|BPF_ABS, 6),
+		/* jump to L1 if it is not IPPROTO_UDP, else to L4 */
+		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, IPPROTO_UDP, 0, 5),
+		/* L4: load udp source port */
+		BPF_STMT(BPF_LD|BPF_H|BPF_ABS, 40),
+		/* jump to L1 if source port is not dhcpv6-server (547), else to L3 */
+		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, 547, 0, 3),
+		/* L3: load udp destination port */
+		BPF_STMT(BPF_LD|BPF_H|BPF_ABS, 42),
+		/* jump to L1 if destination port is not dhcpv6-client (546), else to L2 */
+		BPF_JUMP(BPF_JMP|BPF_JEQ|BPF_K, 546, 0, 1),
+		/* L2: accept packet */
+		BPF_STMT(BPF_RET|BPF_K, 0x7fffffff),
+		/* L1: discard packet */
+		BPF_STMT(BPF_RET|BPF_K, 0),
 	};
 #endif
 #if 0
@@ -224,6 +230,7 @@ static int d6_raw_socket(int ifindex)
 		BPF_STMT(BPF_RET|BPF_K, 0),
 	};
 #endif
+
 	static const struct sock_fprog filter_prog = {
 		.len = sizeof(filter_instr) / sizeof(filter_instr[0]),
 		/* casting const away: */
@@ -240,7 +247,7 @@ static int d6_raw_socket(int ifindex)
 	sock.sll_ifindex = ifindex;
 	xbind(fd, (struct sockaddr *) &sock, sizeof(sock));
 
-#if 0 /* not working! */
+#if 1 /* not working! */
 	if (CLIENT_PORT6 == 546) {
 		/* Use only if standard port is in use */
 		/* Ignoring error (kernel may lack support for this) */
@@ -300,8 +307,8 @@ int dhcp4o6_init (int port, char *cip6, char *sip6)
 	}
 
 	//FIXME choose between SOCKET_RAW and SOCKET_KERNEL with additional flag!
-//	dhcp4o6_data.socket_mode = SOCKET_RAW;
-	dhcp4o6_data.socket_mode = SOCKET_KERNEL;
+	dhcp4o6_data.socket_mode = SOCKET_RAW;
+//	dhcp4o6_data.socket_mode = SOCKET_KERNEL;
 
 	return 0;
 }
