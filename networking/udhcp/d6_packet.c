@@ -11,6 +11,10 @@
 #include <netinet/if_ether.h>
 #include <netpacket/packet.h>
 
+#if ENABLE_FEATURE_DHCP4o6C
+#include "dhcp4o6.h"
+#endif
+
 #if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 2
 void FAST_FUNC d6_dump_packet(struct d6_packet *packet)
 {
@@ -105,7 +109,13 @@ int FAST_FUNC d6_send_raw_packet(
 				offsetof(struct ip6_udp_d6_packet, data) - 4 + d6_pkt_size
 	);
 	/* fix 'hop limit' and 'next header' after UDP checksumming */
-	packet.ip6.ip6_hlim = 10; /* observed Windows machines to use hlim=1 */
+
+#if ENABLE_FEATURE_DHCP4o6C
+	/* 4o6 server could be a few hops away */
+	packet.ip6.ip6_hlim = DHCPv4oDHCPv6_TTL;
+#else
+	packet.ip6.ip6_hlim = 1; /* observed Windows machines to use hlim=1 */
+#endif
 	packet.ip6.ip6_nxt = IPPROTO_UDP;
 
 	d6_dump_packet(d6_pkt);

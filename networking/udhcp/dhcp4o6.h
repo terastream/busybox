@@ -31,6 +31,9 @@ PUSH_AND_SET_FUNCTION_VISIBILITY_TO_HIDDEN
 #define SOCKET_KERNEL 1
 #define SOCKET_RAW    2
 
+/* TTL for DHCP4oDHCP6 packets when they are send over SOCKET_RAW */
+#define DHCPv4oDHCPv6_TTL    40
+
 
 struct dhcp4o6_data_t {
 	/* our IPv6 address & port */
