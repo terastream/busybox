@@ -672,33 +672,27 @@ static void add_client_options(struct dhcp_packet *packet)
 static int raw_bcast_from_client_config_ifindex(struct dhcp_packet *packet)
 {
 #if ENABLE_FEATURE_DHCP4o6C
-	if ( !client_config.mode4o6 )
+	if ( client_config.mode4o6 )
+		return dhcp4o6_send_packet (packet, 1);
 #endif
 	return udhcp_send_raw_packet(packet,
 		/*src*/ INADDR_ANY, CLIENT_PORT,
 		/*dst*/ INADDR_BROADCAST, SERVER_PORT, MAC_BCAST_ADDR,
 		client_config.ifindex);
-#if ENABLE_FEATURE_DHCP4o6C
-	else
-		return dhcp4o6_send_packet (packet, 1);
-#endif
 }
 
 static int bcast_or_ucast(struct dhcp_packet *packet, uint32_t ciaddr, uint32_t server)
 {
 	if (server)
 #if ENABLE_FEATURE_DHCP4o6C
-	{
-		if ( !client_config.mode4o6 )
+		if ( client_config.mode4o6 )
+			return dhcp4o6_send_packet(packet, 0);
+		else
 #endif
 		return udhcp_send_kernel_packet(packet,
 			ciaddr, CLIENT_PORT,
 			server, SERVER_PORT);
-#if ENABLE_FEATURE_DHCP4o6C
-		else
-			return dhcp4o6_send_packet(packet, 0);
-	}
-#endif
+
 	return raw_bcast_from_client_config_ifindex(packet);
 }
 
@@ -1278,7 +1272,7 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 	uint8_t *temp, *message;
 	const char *str_V, *str_h, *str_F, *str_r;
 	IF_FEATURE_UDHCP_PORT(char *str_P;)
-	IF_FEATURE_DHCP4o6C(char *str_6c, *str_6s;)
+	IF_FEATURE_DHCP4o6C(char *str_6c = NULL, *str_6s = NULL;)
 	void *clientid_mac_ptr;
 	llist_t *list_O = NULL;
 	llist_t *list_x = NULL;
@@ -1419,8 +1413,6 @@ int udhcpc_main(int argc UNUSED_PARAM, char **argv)
 #if ENABLE_FEATURE_DHCP4o6C
 	if ( (opt & OPT_6) ) {
 		client_config.mode4o6 = 1;
-		if ( !(opt & OPT_I) )
-			str_6c = NULL;
 #if ENABLE_FEATURE_UDHCP_PORT
 		dhcp4o6_init ((opt & OPT_P), str_6c, str_6s);
 #else
